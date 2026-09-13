@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Загрузчик видео — allatra.tv</title>
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+<link rel="apple-touch-icon" sizes="256x256" href="/static/icon-256.png">
+<style>
+:root {
+  --bg:     #07070f;
+  --s1:     #0f0f1d;
+  --card:   rgba(255,255,255,0.035);
+  --brd:    rgba(255,255,255,0.08);
+  --brd-ac: rgba(99,102,241,0.45);
+  --ac:     #6366f1;
+  --ac2:    #a855f7;
+  --green:  #10b981;
+  --red:    #f87171;
+  --yellow: #fbbf24;
+  --cyan:   #22d3ee;
+  --purple: #c084fc;
+  --text:   #e2e8f0;
+  --muted:  #4b5563;
+  --dim:    #1a1a2e;
+  --r:      14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 36px 16px 60px;
+  line-height: 1.5;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 800px 500px at 50% -80px, rgba(99,102,241,.1) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at 90% 60%, rgba(168,85,247,.06) 0%, transparent 60%);
+  pointer-events: none; z-index: 0;
+}
+.container { width: 100%; max-width: 700px; position: relative; z-index: 1; }
+
+/* ── Header ── */
+.header { text-align: center; padding: 8px 0 28px; }
+.header-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 16px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  font-size: 22px; margin-bottom: 14px;
+  box-shadow: 0 8px 32px rgba(99,102,241,.4);
+}
+.header h1 {
+  font-size: 26px; font-weight: 800; letter-spacing: -.5px;
+  background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 6px;
+}
+.header p { color: var(--muted); font-size: 13px; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex; gap: 4px;
+  background: rgba(0,0,0,.4);
+  border: 1px solid var(--brd);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 14px;
+}
+.tab-btn {
+  flex: 1; padding: 9px 16px;
+  border-radius: 9px; border: none; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; font-family: inherit;
+  color: var(--muted); background: transparent;
+  transition: all .2s;
+}
+.tab-btn.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(99,102,241,.35);
+}
+.tab-btn:not(.active):hover { color: var(--text); background: rgba(255,255,255,.05); }
+
+.tab-pane { display: none; flex-direction: column; gap: 12px; }
+.tab-pane.active { display: flex; }
+
+/* ── Card ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--brd);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  transition: border-color .2s;
+}
+.card:focus-within { border-color: var(--brd-ac); }
+.card-label {
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); margin-bottom: 10px;
+}
+
+/* ── Inputs ── */
+input[type=text], select, textarea {
+  width: 100%;
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--brd);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 14px; padding: 10px 14px;
+  outline: none; font-family: inherit;
+  transition: border-color .2s, box-shadow .2s;
+}
+input[type=text]:focus, select:focus, textarea:focus {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.18);
+}
+input[type=text]::placeholder,
+textarea::placeholder { color: var(--muted); }
+
+textarea {
+  resize: vertical; min-height: 130px; max-height: 320px;
+  line-height: 1.7; font-size: 13px;
+  font-family: Consolas, monospace;
+}
+
+select {
+  cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 36px;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 10px 18px; border-radius: 10px;
+  font-size: 13.5px; font-weight: 600; cursor: pointer;
+  border: none; font-family: inherit; transition: all .2s; white-space: nowrap;
+}
+.btn-ghost {
+  background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.25); color: #818cf8;
+}
+.btn-ghost:hover:not(:disabled) { background: rgba(99,102,241,.2); border-color: rgba(99,102,241,.5); }
+.btn-ghost:disabled { opacity: .4; cursor: not-allowed; }
+
+.btn-icon {
+  padding: 10px 12px;
+  background: rgba(255,255,255,.05); border: 1px solid var(--brd); color: var(--muted);
+}
+.btn-icon:hover { background: rgba(255,255,255,.1); color: var(--text); }
+
+.btn-clear {
+  font-size: 11px; padding: 4px 10px; border-radius: 6px;
+  background: transparent; border: 1px solid var(--brd); color: var(--muted);
+  cursor: pointer; font-family: inherit; transition: all .2s;
+}
+.btn-clear:hover { border-color: rgba(255,255,255,.18); color: var(--text); }
+
+/* ── URL row ── */
+.url-row { display: flex; gap: 8px; }
+.url-row input { flex: 1; }
+
+/* ── Sources ── */
+.sources-wrap { display: flex; flex-direction: column; gap: 8px; }
+.source-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--brd); cursor: pointer;
+  transition: all .2s; background: rgba(0,0,0,.2); user-select: none;
+}
+.source-item:hover { border-color: rgba(99,102,241,.3); background: rgba(99,102,241,.04); }
+.source-item.active { border-color: var(--ac); background: rgba(99,102,241,.08); box-shadow: 0 0 0 1px rgba(99,102,241,.2); }
+.radio-dot {
+  flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--muted);
+  display: flex; align-items: center; justify-content: center; transition: all .2s;
+}
+.source-item.active .radio-dot { border-color: var(--ac); background: var(--ac); }
+.source-item.active .radio-dot::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+
+.badge {
+  flex-shrink: 0; font-size: 10.5px; font-weight: 700;
+  padding: 3px 9px; border-radius: 6px; letter-spacing: .02em;
+}
+.badge-allatra { background: rgba(14,165,233,.15); color: #38bdf8; border: 1px solid rgba(14,165,233,.3); }
+.badge-odysee  { background: rgba(139,92,246,.15); color: #c084fc; border: 1px solid rgba(139,92,246,.3); }
+.badge-youtube { background: rgba(239,68,68,.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,.3); }
+.badge-rumble  { background: rgba(133,77,14,.25);  color: #fbbf24; border: 1px solid rgba(251,191,36,.3); }
+.badge-facebook{ background: rgba(24,119,242,.15); color: #60a5fa; border: 1px solid rgba(96,165,250,.3); }
+
+.source-body { flex: 1; min-width: 0; }
+.source-kind { font-size: 12.5px; font-weight: 500; color: var(--text); }
+.source-url { font-size: 11px; color: var(--muted); font-family: Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.tag { font-size: 10px; padding: 2px 7px; border-radius: 5px; background: rgba(99,102,241,.12); color: #818cf8; border: 1px solid rgba(99,102,241,.2); }
+.tag-mp4 { background: rgba(16,185,129,.1); color: #6ee7b7; border-color: rgba(16,185,129,.2); }
+
+/* ── Options ── */
+.opts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 11px; color: var(--muted); font-weight: 500; }
+.folder-row { display: flex; gap: 6px; }
+.folder-row input { flex: 1; }
+.checkbox-row {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; color: var(--muted); font-size: 13px; padding: 10px 0;
+}
+.checkbox-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--ac); cursor: pointer; }
+
+/* ── Download button ── */
+.btn-download {
+  width: 100%; padding: 14px 20px;
+  font-size: 16px; font-weight: 700; letter-spacing: .02em;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; border: none; border-radius: 12px;
+  cursor: pointer; font-family: inherit; transition: all .25s;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+}
+.btn-download:hover:not(:disabled) {
+  background: linear-gradient(135deg, #818cf8, #a78bfa);
+  transform: translateY(-2px); box-shadow: 0 14px 36px rgba(99,102,241,.38);
+}
+.btn-download:active:not(:disabled) { transform: translateY(0); }
+.btn-download:disabled { opacity: .32; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ── Progress ── */
+.progress-box { margin-top: 14px; }
+.progress-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.progress-label { font-size: 12px; color: var(--muted); }
+.progress-pct { font-size: 13px; font-weight: 700; color: #818cf8; font-family: Consolas, monospace; }
+.progress-track { height: 5px; background: rgba(255,255,255,.06); border-radius: 10px; overflow: hidden; }
+.progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #c084fc);
+  border-radius: 10px; transition: width .35s ease; position: relative;
+}
+.progress-fill::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.25) 50%, transparent 100%);
+  animation: shimmer 1.8s infinite;
+}
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+.progress-fill.spin {
+  width: 35% !important; transition: none;
+  animation: slide-in 1.6s ease-in-out infinite;
+}
+@keyframes slide-in { 0% { transform: translateX(-200%); } 60% { transform: translateX(300%); } 100% { transform: translateX(300%); } }
+
+/* ── Log ── */
+.log-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.log-area {
+  background: rgba(0,0,0,.45); border: 1px solid var(--brd);
+  border-radius: 10px; padding: 12px 14px;
+  height: 240px; overflow-y: auto;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px; line-height: 1.75; color: #94a3b8;
+}
+.log-area::-webkit-scrollbar { width: 4px; }
+.log-area::-webkit-scrollbar-track { background: transparent; }
+.log-area::-webkit-scrollbar-thumb { background: rgba(99,102,241,.3); border-radius: 4px; }
+.log-area::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.55); }
+.ll { display: block; }
+.ll-ok      { color: #34d399; }
+.ll-err     { color: #f87171; }
+.ll-info    { color: #22d3ee; }
+.ll-warn    { color: #fbbf24; }
+.ll-prog    { color: #818cf8; }
+.ll-section { color: #c084fc; font-weight: 600; }
+.ll-dim     { color: #1f2937; }
+
+/* ── Bulk: mode selector ── */
+.mode-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.mode-btn {
+  flex: 1; padding: 10px; border-radius: 10px;
+  border: 1px solid var(--brd); background: rgba(0,0,0,.2);
+  color: var(--muted); font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.mode-btn:hover { border-color: rgba(99,102,241,.3); color: var(--text); }
+.mode-btn.active {
+  border-color: var(--ac); background: rgba(99,102,241,.12); color: #818cf8;
+}
+
+/* ── Bulk: queue list ── */
+.queue-list { display: flex; flex-direction: column; gap: 8px; }
+
+.queue-item {
+  background: rgba(0,0,0,.25);
+  border: 1px solid var(--brd);
+  border-radius: 12px; padding: 12px 14px;
+  transition: border-color .2s;
+}
+.queue-item.status-downloading { border-color: rgba(99,102,241,.4); }
+.queue-item.status-done  { border-color: rgba(16,185,129,.35); }
+.queue-item.status-error { border-color: rgba(248,113,113,.35); }
+
+.qi-head { display: flex; align-items: center; gap: 10px; }
+.qi-num {
+  width: 24px; height: 24px; border-radius: 8px; flex-shrink: 0;
+  background: rgba(99,102,241,.15); color: #818cf8;
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.qi-url {
+  flex: 1; font-size: 12px; color: var(--muted);
+  font-family: Consolas, monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.qi-status {
+  font-size: 11.5px; font-weight: 600; flex-shrink: 0;
+  padding: 3px 10px; border-radius: 6px;
+}
+.qi-status.pending     { background: rgba(255,255,255,.06); color: var(--muted); }
+.qi-status.downloading { background: rgba(99,102,241,.15); color: #818cf8; }
+.qi-status.done        { background: rgba(16,185,129,.15); color: #6ee7b7; }
+.qi-status.error       { background: rgba(248,113,113,.15); color: #fca5a5; }
+
+.qi-progress { margin-top: 8px; }
+.qi-prog-track { height: 3px; background: rgba(255,255,255,.06); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.qi-prog-fill  { height: 100%; background: linear-gradient(90deg, #6366f1, #c084fc); border-radius: 3px; transition: width .3s; }
+.qi-prog-label { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; justify-content: space-between; }
+
+.qi-log { font-size: 11px; color: var(--muted); font-family: Consolas, monospace; margin-top: 6px; max-height: 60px; overflow: hidden; line-height: 1.5; }
+.qi-log.expanded { max-height: none; }
+
+/* ── Summary banner ── */
+.summary {
+  padding: 14px 16px; border-radius: 12px;
+  background: rgba(16,185,129,.08);
+  border: 1px solid rgba(16,185,129,.25);
+  color: #6ee7b7; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ── Misc ── */
+.status-bar { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+.spinner {
+  display: inline-block; width: 13px; height: 13px;
+  border: 2px solid rgba(99,102,241,.25); border-top-color: #818cf8;
+  border-radius: 50%; animation: spin .65s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.slide-in { animation: slideIn .28s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.hidden { display: none !important; }
+
+/* Bulk opts row */
+.bulk-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.url-count { font-size: 11px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">⬇</div>
+    <h1>Загрузчик видео</h1>
+    <p>allatra.tv &nbsp;·&nbsp; AllatRa&nbsp;TV (прямой&nbsp;MP4) &nbsp;·&nbsp; Odysee &nbsp;·&nbsp; YouTube</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('single')">▶&nbsp;&nbsp;Одна ссылка</button>
+    <button class="tab-btn" onclick="switchTab('bulk')">≡&nbsp;&nbsp;Массовая загрузка</button>
+    <button class="tab-btn" onclick="switchTab('parse')">🔗&nbsp;&nbsp;Парсинг категории</button>
+  </div>
+
+  <!-- ════════════════ TAB: SINGLE ════════════════ -->
+  <div class="tab-pane active" id="tab-single">
+
+    <!-- URL -->
+    <div class="card">
+      <div class="card-label">Страница allatra.tv</div>
+      <div class="url-row">
+        <input type="text" id="url-input"
+               placeholder="https://allatra.tv/video/..."
+               value="https://allatra.tv/video/spasibo">
+        <button class="btn btn-ghost" id="btn-find" onclick="findSources()">
+          🔍&nbsp;Найти
+        </button>
+      </div>
+    </div>
+
+    <!-- Sources -->
+    <div class="card hidden" id="sources-card">
+      <div class="card-label">Источники</div>
+      <div class="sources-wrap" id="sources-list"></div>
+    </div>
+
+    <!-- Options -->
+    <div class="card hidden" id="options-card">
+      <div class="opts-grid">
+        <div class="field">
+          <div class="field-label">Качество</div>
+          <select id="quality-select"><option>Лучшее (bestvideo+bestaudio)</option></select>
+        </div>
+        <div class="field">
+          <div class="field-label">Опции</div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="subs-check"> Субтитры (YouTube/Odysee)
+          </label>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <div class="field-label">Папка сохранения</div>
+        <div class="folder-row">
+          <input type="text" id="folder-input" placeholder="Путь к папке...">
+          <button class="btn btn-icon" onclick="browseFolder('folder-input')">📁</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download -->
+    <div class="card">
+      <button class="btn-download" id="btn-download" disabled onclick="startDownload()">
+        ⬇&nbsp;&nbsp;Скачать
+      </button>
+      <div class="progress-box hidden" id="progress-box">
+        <div class="progress-head">
+          <span class="progress-label" id="progress-label">Загрузка...</span>
+          <span class="progress-pct" id="progress-pct"></span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="log-head">
+        <div class="card-label" style="margin:0">Лог</div>
+        <button class="btn-clear" onclick="clearLog('log-area')">очистить</button>
+      </div>
+      <div class="log-area" id="log-area">
+        <span class="ll ll-dim">── готов к работе</span>
+      </div>
+    </div>
+
+    <div class="status-bar" id="status-bar">Готов</div>
+  </div>
+  <!-- /tab-single -->
+
+
+  <!-- ════════════════ TAB: BULK ════════════════ -->
+  <div class="tab-pane" id="tab-bulk">
+
+    <!-- URLs textarea -->
+    <div class="card">
+      <div class="card-label">Ссылки на страницы allatra.tv — по одной на строке</div>
+      <textarea id="bulk-urls"
+                placeholder="https://allatra.tv/video/spasibo&#10;https://allatra.tv/video/...&#10;https://allatra.tv/video/..."></textarea>
+      <div class="url-count" id="bulk-count">0 ссылок</div>
+    </div>
+
+    <!-- Mode: video / audio -->
+    <div class="card">
+      <div class="card-label">Формат</div>
+      <div class="mode-row">
+        <button class="mode-btn active" id="mode-video" onclick="setMode('video')">
+          🎬&nbsp; Видео (MP4)
+        </button>
+        <button class="mode-btn" id="mode-audio" onclick="setMode('audio')">
+          🎵&nbsp; Только аудио (MP3)
+        </button>
+      </div>
+
+      <div class="bulk-opts">
+        <div class="field" id="quality-field">
+          <div class="field-label">Качество видео</div>
+          <select id="bulk-quality">
+            <option value="1080p">1080p</option>
+            <option value="720p" selected>720p</option>
+            <option value="480p">480p</option>
+            <option value="360p">360p</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Папка сохранения</div>
+          <div class="folder-row">
+            <input type="text" id="bulk-folder" placeholder="Путь...">
+            <button class="btn btn-icon" onclick="browseFolder('bulk-folder')">📁</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start button -->
+    <div class="card">
+      <button class="btn-download" id="btn-bulk" onclick="startBulk()">
+        ⬇&nbsp;&nbsp;Начать загрузку
+      </button>
+    </div>
+
+    <!-- Queue -->
+    <div class="hidden" id="bulk-queue-section">
+      <div class="card">
+        <div class="log-head">
+          <div class="card-label" style="margin:0">Очередь загрузки</div>
+          <span id="bulk-progress-label" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div class="queue-list" id="queue-list"></div>
+      </div>
+
+      <!-- Overall progress -->
+      <div class="card" id="bulk-overall-card">
+        <div class="progress-head">
+          <span class="progress-label" id="bulk-overall-label">Обработка...</span>
+          <span class="progress-pct" id="bulk-overall-pct"></span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="bulk-overall-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Done summary -->
+    <div class="hidden summary" id="bulk-summary"></div>
+
+    <!-- Bulk log -->
+    <div class="card">
+      <div class="log-head">
+        <div class="card-label" style="margin:0">Лог</div>
+        <button class="btn-clear" onclick="clearLog('bulk-log-area')">очистить</button>
+      </div>
+      <div class="log-area" id="bulk-log-area">
+        <span class="ll ll-dim">── готов к работе</span>
+      </div>
+    </div>
+
+    <div class="status-bar" id="bulk-status-bar">Готов</div>
+  </div>
+  <!-- /tab-bulk -->
+
+
+  <!-- ════════════════ TAB: PARSE ════════════════ -->
+  <div class="tab-pane" id="tab-parse">
+
+    <div class="card">
+      <div class="card-label">URL категории allatra.tv</div>
+      <div class="url-row">
+        <input type="text" id="parse-url"
+               placeholder="https://allatra.tv/category/moj-put-k-zhizni">
+        <button class="btn btn-ghost" id="btn-parse" onclick="startParse()">
+          🔍&nbsp;Парсить
+        </button>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+        <label class="checkbox-row" style="padding:0">
+          <input type="checkbox" id="parse-all-pages" checked>
+          Все страницы автоматически
+        </label>
+        <span id="parse-pages-hint" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card hidden" id="parse-progress-card">
+      <div class="progress-head">
+        <span class="progress-label" id="parse-progress-label">Парсинг...</span>
+        <span class="progress-pct" id="parse-progress-pct"></span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="parse-progress-fill"></div></div>
+    </div>
+
+    <!-- Results -->
+    <div class="hidden" id="parse-results-section">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <div style="font-size:15px; font-weight:700; color:var(--text)" id="parse-title"></div>
+            <div style="font-size:12px; color:var(--muted); margin-top:3px" id="parse-count"></div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-clear" style="padding:7px 14px;" onclick="copyLinks()">📋 Скопировать</button>
+            <button class="btn btn-ghost" style="padding:7px 14px; font-size:13px;" onclick="sendToBulk()">
+              ≡&nbsp; → в загрузку
+            </button>
+          </div>
+        </div>
+        <textarea id="parse-links-area"
+                  style="height:280px; font-size:12px;"
+                  readonly placeholder="Ссылки появятся здесь..."></textarea>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="log-head">
+        <div class="card-label" style="margin:0">Лог</div>
+        <button class="btn-clear" onclick="clearLog('parse-log-area')">очистить</button>
+      </div>
+      <div class="log-area" id="parse-log-area" style="height:180px;">
+        <span class="ll ll-dim">── готов к работе</span>
+      </div>
+    </div>
+
+    <div class="status-bar" id="parse-status-bar">Готов</div>
+  </div>
+  <!-- /tab-parse -->
+
+</div>
+
+<script>
+'use strict';
+
+/* ─── Tab switching ─── */
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) =>
+    b.classList.toggle('active', ['single','bulk','parse'][i] === name));
+  document.querySelectorAll('.tab-pane').forEach(p =>
+    p.classList.toggle('active', p.id === 'tab-' + name));
+}
+
+/* ─── Init ─── */
+fetch('/api/default-folder').then(r => r.json()).then(d => {
+  document.getElementById('folder-input').value = d.folder;
+  document.getElementById('bulk-folder').value  = d.folder;
+}).catch(() => {});
+
+/* ── URL counter ── */
+document.getElementById('bulk-urls').addEventListener('input', () => {
+  const lines = document.getElementById('bulk-urls').value
+    .split('\n').filter(l => l.trim()).length;
+  document.getElementById('bulk-count').textContent =
+    lines ? `${lines} ссылк${lines === 1 ? 'а' : lines < 5 ? 'и' : ''}`
+          : '0 ссылок';
+});
+
+/* ─── Mode toggle ─── */
+let bulkMode = 'video';
+function setMode(m) {
+  bulkMode = m;
+  document.getElementById('mode-video').classList.toggle('active', m === 'video');
+  document.getElementById('mode-audio').classList.toggle('active', m === 'audio');
+  document.getElementById('quality-field').style.opacity  = m === 'video' ? '1' : '.35';
+  document.getElementById('quality-field').style.pointerEvents = m === 'video' ? '' : 'none';
+}
+
+/* ─── Log helpers ─── */
+function log(text, cls, areaId = 'log-area') {
+  const area = document.getElementById(areaId);
+  const sp = document.createElement('span');
+  sp.className = 'll' + (cls ? ' ll-' + cls : '');
+  sp.textContent = text;
+  area.appendChild(sp);
+  area.appendChild(document.createTextNode('\n'));
+  area.scrollTop = area.scrollHeight;
+}
+function clearLog(id) { document.getElementById(id).innerHTML = ''; }
+function setStatus(t, id = 'status-bar') { document.getElementById(id).textContent = t; }
+
+function autoTag(text) {
+  const t = text.toLowerCase();
+  if (/^(✅|✓)/.test(text))                         return 'ok';
+  if (/^(✗|❌)/.test(text) || t.includes('error'))  return 'err';
+  if (text.startsWith('▶'))                           return 'section';
+  if (t.includes('[download]'))                       return 'prog';
+  if (t.includes('[info]') || t.includes('[youtube]') || t.includes('[odysee]')) return 'info';
+  if (t.includes('warning'))                          return 'warn';
+  if (text.startsWith('─'))                           return 'dim';
+  return '';
+}
+
+/* ─── Single: progress ─── */
+function showProgress(label = 'Загрузка...') {
+  document.getElementById('progress-box').classList.remove('hidden');
+  document.getElementById('progress-label').textContent = label;
+}
+function setProgress(pct, label) {
+  const fill = document.getElementById('progress-fill');
+  fill.classList.remove('spin');
+  fill.style.width = pct + '%';
+  if (label) document.getElementById('progress-label').textContent = label;
+  document.getElementById('progress-pct').textContent = pct > 0 ? Math.round(pct) + '%' : '';
+}
+function startSpin(label = 'Загружаю...') {
+  document.getElementById('progress-box').classList.remove('hidden');
+  document.getElementById('progress-fill').classList.add('spin');
+  document.getElementById('progress-label').textContent = label;
+  document.getElementById('progress-pct').textContent = '';
+}
+function stopSpin() {
+  const fill = document.getElementById('progress-fill');
+  fill.classList.remove('spin');
+  fill.style.width = '0%';
+  document.getElementById('progress-pct').textContent = '';
+  document.getElementById('progress-box').classList.add('hidden');
+}
+
+/* ─── Folder browser ─── */
+async function browseFolder(inputId) {
+  try {
+    const resp = await fetch('/api/browse-folder');
+    const data = await resp.json();
+    if (data.folder) document.getElementById(inputId).value = data.folder;
+  } catch (e) {}
+}
+
+/* ════════════════ SINGLE TAB ════════════════ */
+let sources = [], selected = null, evtSrc = null;
+
+function reveal(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('hidden'); el.classList.add('slide-in');
+}
+function sortQualities(qs) { return qs.sort((a,b) => parseInt(b) - parseInt(a)); }
+function badgeClass(name) {
+  if (name === 'YouTube' || name.includes('YouTube')) return 'badge-youtube';
+  if (name === 'Odysee')  return 'badge-odysee';
+  if (name === 'Rumble')    return 'badge-rumble';
+  if (name === 'Facebook')  return 'badge-facebook';
+  return 'badge-allatra';
+}
+
+async function findSources() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+
+  const btn = document.getElementById('btn-find');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Ищу...';
+  document.getElementById('btn-download').disabled = true;
+  startSpin('Загружаю страницу...');
+
+  log('─'.repeat(58), 'dim');
+  log('▶ Открываю: ' + url, 'section');
+
+  try {
+    const resp = await fetch('/api/find', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await resp.json();
+
+    if (data.error) {
+      log('✗ ' + data.error, 'err'); setStatus('Ошибка поиска');
+    } else {
+      sources = data.sources;
+      renderSources(sources);
+      log('✓ Найдено источников: ' + sources.length, 'ok');
+      sources.forEach(s => {
+        let extra = '';
+        if (s.kind === 'allatra_direct' && s.mp4_urls) {
+          extra = '  [MP4: ' + sortQualities(Object.keys(s.mp4_urls)).join(', ') + ']';
+        }
+        log(`  • ${s.name}: ${s.url}${extra}`, 'info');
+      });
+      setStatus(`Найдено: ${sources.length}`);
+      reveal('sources-card'); reveal('options-card');
+    }
+  } catch (e) {
+    log('✗ ' + e.message, 'err'); setStatus('Ошибка сети');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔍&nbsp;Найти';
+    stopSpin();
+  }
+}
+
+function renderSources(srcs) {
+  const list = document.getElementById('sources-list');
+  list.innerHTML = '';
+  const preferred =
+    srcs.find(s => s.kind === 'allatra_direct') ||
+    srcs.find(s => s.url.includes('odysee')) || srcs[0];
+
+  srcs.forEach(src => {
+    const item = document.createElement('div');
+    item.className = 'source-item' + (src === preferred ? ' active' : '');
+    item.addEventListener('click', () => selectSource(src));
+
+    const tags = document.createElement('div');
+    tags.className = 'tags';
+    if (src.kind === 'allatra_direct' && src.mp4_urls) {
+      sortQualities(Object.keys(src.mp4_urls)).forEach(q => {
+        const tag = document.createElement('span');
+        tag.className = 'tag tag-mp4';
+        tag.textContent = q;
+        tags.appendChild(tag);
+      });
+    } else {
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = 'yt-dlp';
+      tags.appendChild(tag);
+    }
+    const kindLabel = src.kind === 'allatra_direct'
+      ? '✦ Прямой MP4 — без YouTube, без посредников'
+      : '◈ Через yt-dlp';
+
+    const dot = document.createElement('div');
+    dot.className = 'radio-dot';
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + badgeClass(String(src.name || ''));
+    badge.textContent = src.name;
+    const body = document.createElement('div');
+    body.className = 'source-body';
+    const kind = document.createElement('div');
+    kind.className = 'source-kind';
+    kind.textContent = kindLabel;
+    const url = document.createElement('div');
+    url.className = 'source-url';
+    url.textContent = src.url;
+    body.append(kind, url, tags);
+    item.append(dot, badge, body);
+    list.appendChild(item);
+  });
+  selectSource(preferred);
+}
+
+function selectSource(src) {
+  selected = src;
+  document.querySelectorAll('.source-item').forEach((el, i) =>
+    el.classList.toggle('active', sources[i] === src));
+
+  const sel = document.getElementById('quality-select');
+  sel.innerHTML = '';
+  if (src.kind === 'allatra_direct' && src.mp4_urls) {
+    sortQualities(Object.keys(src.mp4_urls)).forEach(q => {
+      const o = document.createElement('option'); o.value = q; o.textContent = q; sel.appendChild(o);
+    });
+    document.querySelector('#options-card .checkbox-row').style.opacity = '.3';
+    document.querySelector('#options-card .checkbox-row').style.pointerEvents = 'none';
+  } else {
+    ['Лучшее (bestvideo+bestaudio)','1080p','720p','480p','360p','Только аудио (mp3)']
+      .forEach(q => { const o = document.createElement('option'); o.value=q; o.textContent=q; sel.appendChild(o); });
+    document.querySelector('#options-card .checkbox-row').style.opacity = '1';
+    document.querySelector('#options-card .checkbox-row').style.pointerEvents = '';
+  }
+  document.getElementById('btn-download').disabled = false;
+}
+
+function startDownload() {
+  if (!selected) return;
+  const folder  = document.getElementById('folder-input').value.trim();
+  const quality = document.getElementById('quality-select').value;
+  const subs    = document.getElementById('subs-check').checked;
+  if (!folder) { alert('Укажи папку'); return; }
+  if (evtSrc) { evtSrc.close(); evtSrc = null; }
+
+  document.getElementById('btn-download').disabled = true;
+  startSpin('Подготовка...');
+  log('─'.repeat(58), 'dim');
+  log(`▶ Загрузка  [${selected.name}]  ${quality}`, 'section');
+  setStatus('Загружаю...');
+
+  const pageUrl = document.getElementById('url-input').value.trim();
+  const p = new URLSearchParams({ url: selected.url, kind: selected.kind, quality, folder, subs: subs?'1':'0', page_url: pageUrl });
+  if (selected.kind === 'allatra_direct' && selected.mp4_urls)
+    p.set('mp4_url', selected.mp4_urls[quality] || '');
+
+  evtSrc = new EventSource('/api/download?' + p);
+  evtSrc.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'done') {
+      setProgress(100, 'Готово!');
+      log('✅ Загрузка завершена!', 'ok');
+      setStatus('Готово! → ' + folder);
+      document.getElementById('btn-download').disabled = false;
+      document.getElementById('progress-pct').textContent = '100%';
+      evtSrc.close(); evtSrc = null; return;
+    }
+    if (msg.type === 'error') {
+      log('✗ ' + msg.text, 'err'); setStatus('Ошибка'); stopSpin();
+      document.getElementById('btn-download').disabled = false;
+      evtSrc.close(); evtSrc = null; return;
+    }
+    if (msg.pct !== undefined) setProgress(msg.pct, msg.label || 'Загрузка...');
+    if (msg.text) log(msg.text, autoTag(msg.text));
+  };
+  evtSrc.onerror = () => {
+    if (evtSrc) { evtSrc.close(); evtSrc = null; }
+    stopSpin();
+    document.getElementById('btn-download').disabled = false;
+  };
+}
+
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') findSources();
+});
+document.getElementById('parse-url').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startParse();
+});
+
+/* ════════════════ BULK TAB ════════════════ */
+let bulkEvtSrc = null;
+let bulkTotal = 0, bulkDone = 0, bulkErrors = 0;
+
+function startBulk() {
+  const raw = document.getElementById('bulk-urls').value.trim();
+  const urls = raw.split('\n').map(u => u.trim()).filter(Boolean);
+  if (!urls.length) { alert('Добавь хотя бы одну ссылку'); return; }
+
+  const folder  = document.getElementById('bulk-folder').value.trim();
+  const quality = document.getElementById('bulk-quality').value;
+  if (!folder) { alert('Укажи папку'); return; }
+
+  if (bulkEvtSrc) { bulkEvtSrc.close(); bulkEvtSrc = null; }
+
+  bulkTotal = urls.length; bulkDone = 0; bulkErrors = 0;
+
+  // Build queue UI
+  buildQueueUI(urls);
+  document.getElementById('bulk-queue-section').classList.remove('hidden');
+  document.getElementById('bulk-queue-section').classList.add('slide-in');
+  document.getElementById('bulk-summary').classList.add('hidden');
+  document.getElementById('btn-bulk').disabled = true;
+  setStatus('Загружаю очередь...', 'bulk-status-bar');
+  updateOverall(0, `0 / ${bulkTotal}`);
+
+  log('─'.repeat(58), 'dim', 'bulk-log-area');
+  log(`▶ Начинаю массовую загрузку: ${bulkTotal} ссылок  [${bulkMode === 'audio' ? 'MP3' : quality}]`, 'section', 'bulk-log-area');
+
+  const p = new URLSearchParams({
+    urls: urls.join('\n'),
+    mode: bulkMode, quality, folder,
+  });
+
+  bulkEvtSrc = new EventSource('/api/bulk-download?' + p);
+  bulkEvtSrc.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    handleBulkMessage(msg);
+  };
+  bulkEvtSrc.onerror = () => {
+    if (bulkEvtSrc) { bulkEvtSrc.close(); bulkEvtSrc = null; }
+    document.getElementById('btn-bulk').disabled = false;
+    setStatus('Соединение прервано', 'bulk-status-bar');
+  };
+}
+
+function buildQueueUI(urls) {
+  const list = document.getElementById('queue-list');
+  list.innerHTML = '';
+  urls.forEach((url, i) => {
+    const item = document.createElement('div');
+    item.className = 'queue-item'; item.id = `qi-${i}`;
+    item.innerHTML = `
+      <div class="qi-head">
+        <div class="qi-num">${i+1}</div>
+        <div class="qi-url"></div>
+        <div class="qi-status pending" id="qi-status-${i}">ожидание</div>
+      </div>
+      <div class="qi-progress hidden" id="qi-prog-${i}">
+        <div class="qi-prog-track"><div class="qi-prog-fill" id="qi-fill-${i}" style="width:0%"></div></div>
+        <div class="qi-prog-label">
+          <span id="qi-plabel-${i}"></span>
+          <span id="qi-ppct-${i}"></span>
+        </div>
+      </div>
+      <div class="qi-log hidden" id="qi-log-${i}"></div>`;
+    const urlLabel = item.querySelector('.qi-url');
+    urlLabel.textContent = url;
+    urlLabel.title = url;
+    list.appendChild(item);
+  });
+}
+
+function handleBulkMessage(msg) {
+  const idx = msg.idx;
+
+  if (msg.type === 'item-start') {
+    setQiStatus(idx, 'downloading', '⟳ загрузка');
+    document.getElementById(`qi-${idx}`).classList.add('status-downloading');
+    document.getElementById(`qi-prog-${idx}`).classList.remove('hidden');
+    log(`▶ [${idx+1}/${bulkTotal}] ${msg.url}`, 'section', 'bulk-log-area');
+    setStatus(`Скачиваю ${idx+1} из ${bulkTotal}...`, 'bulk-status-bar');
+    document.getElementById('bulk-progress-label').textContent = `${idx+1} / ${bulkTotal}`;
+    return;
+  }
+
+  if (msg.type === 'progress') {
+    document.getElementById(`qi-fill-${idx}`).style.width  = (msg.pct || 0) + '%';
+    document.getElementById(`qi-ppct-${idx}`).textContent  = msg.pct ? Math.round(msg.pct) + '%' : '';
+    document.getElementById(`qi-plabel-${idx}`).textContent = msg.label || '';
+    updateOverall(((bulkDone + (msg.pct||0)/100) / bulkTotal) * 100, `${bulkDone} / ${bulkTotal} готово`);
+    return;
+  }
+
+  if (msg.type === 'log') {
+    appendQiLog(idx, msg.text);
+    if (msg.text) log(`  ${msg.text}`, autoTag(msg.text), 'bulk-log-area');
+    return;
+  }
+
+  if (msg.type === 'item-done') {
+    bulkDone++;
+    setQiStatus(idx, 'done', '✓ готово');
+    document.getElementById(`qi-${idx}`).classList.remove('status-downloading');
+    document.getElementById(`qi-${idx}`).classList.add('status-done');
+    document.getElementById(`qi-fill-${idx}`).style.width = '100%';
+    document.getElementById(`qi-ppct-${idx}`).textContent = '100%';
+    log(`✅ [${idx+1}] Готово`, 'ok', 'bulk-log-area');
+    updateOverall((bulkDone / bulkTotal) * 100, `${bulkDone} / ${bulkTotal} готово`);
+    return;
+  }
+
+  if (msg.type === 'item-error') {
+    bulkErrors++;
+    setQiStatus(idx, 'error', '✗ ошибка');
+    document.getElementById(`qi-${idx}`).classList.remove('status-downloading');
+    document.getElementById(`qi-${idx}`).classList.add('status-error');
+    appendQiLog(idx, '✗ ' + msg.text);
+    log(`✗ [${idx+1}] ${msg.text}`, 'err', 'bulk-log-area');
+    bulkDone++;
+    updateOverall((bulkDone / bulkTotal) * 100, `${bulkDone} / ${bulkTotal} готово`);
+    return;
+  }
+
+  if (msg.type === 'all-done') {
+    const ok = bulkTotal - bulkErrors;
+    const sumEl = document.getElementById('bulk-summary');
+    sumEl.classList.remove('hidden');
+    sumEl.innerHTML = `✅&nbsp; Загрузка завершена: <strong>${ok}</strong> из <strong>${bulkTotal}</strong> файлов успешно${bulkErrors ? `, <span style="color:#f87171">${bulkErrors} ошибок</span>` : ''}`;
+    log(`✅ Все готово: ${ok}/${bulkTotal} успешно`, 'ok', 'bulk-log-area');
+    setStatus('Готово!', 'bulk-status-bar');
+    document.getElementById('btn-bulk').disabled = false;
+    updateOverall(100, `${ok} / ${bulkTotal} готово`);
+    if (bulkEvtSrc) { bulkEvtSrc.close(); bulkEvtSrc = null; }
+    return;
+  }
+}
+
+function setQiStatus(idx, cls, text) {
+  const el = document.getElementById(`qi-status-${idx}`);
+  el.className = `qi-status ${cls}`;
+  el.textContent = text;
+}
+
+function appendQiLog(idx, text) {
+  const el = document.getElementById(`qi-log-${idx}`);
+  el.classList.remove('hidden');
+  el.textContent = text; // show last line
+}
+
+function updateOverall(pct, label) {
+  document.getElementById('bulk-overall-fill').style.width = pct + '%';
+  document.getElementById('bulk-overall-pct').textContent  = Math.round(pct) + '%';
+  document.getElementById('bulk-overall-label').textContent = label;
+}
+
+/* ════════════════ PARSE TAB ════════════════ */
+let parseEvtSrc = null;
+let parsedLinks = [];
+
+function startParse() {
+  const url = document.getElementById('parse-url').value.trim();
+  if (!url) { alert('Введи URL категории'); return; }
+
+  const allPages = document.getElementById('parse-all-pages').checked;
+
+  if (parseEvtSrc) { parseEvtSrc.close(); parseEvtSrc = null; }
+  parsedLinks = [];
+
+  document.getElementById('btn-parse').disabled = true;
+  document.getElementById('btn-parse').innerHTML = '<span class="spinner"></span> Парсинг...';
+  document.getElementById('parse-progress-card').classList.remove('hidden');
+  document.getElementById('parse-progress-card').classList.add('slide-in');
+  document.getElementById('parse-results-section').classList.add('hidden');
+  document.getElementById('parse-links-area').value = '';
+  document.getElementById('parse-title').textContent = '';
+  document.getElementById('parse-count').textContent = '';
+  setParsePct(0, 'Загружаю...');
+
+  log('─'.repeat(58), 'dim', 'parse-log-area');
+  log('▶ Парсю: ' + url + (allPages ? '  [все страницы]' : ''), 'section', 'parse-log-area');
+  setStatus('Парсинг...', 'parse-status-bar');
+
+  const p = new URLSearchParams({ url, all_pages: allPages ? '1' : '0' });
+  parseEvtSrc = new EventSource('/api/parse-category?' + p);
+
+  parseEvtSrc.onmessage = e => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'info') {
+      log(msg.text, 'info', 'parse-log-area');
+      if (msg.title) document.getElementById('parse-title').textContent = msg.title;
+      return;
+    }
+
+    if (msg.type === 'page_done') {
+      const pct = (msg.page / msg.max_page) * 100;
+      setParsePct(pct, `Страница ${msg.page} из ${msg.max_page}...`);
+      log(msg.text, 'prog', 'parse-log-area');
+      document.getElementById('parse-pages-hint').textContent =
+        `${msg.page} / ${msg.max_page} стр.`;
+      return;
+    }
+
+    if (msg.type === 'done') {
+      parsedLinks = msg.urls || [];
+      setParsePct(100, 'Готово!');
+      document.getElementById('parse-links-area').value = parsedLinks.join('\n');
+      document.getElementById('parse-count').textContent =
+        `Найдено: ${parsedLinks.length} видео`;
+      document.getElementById('parse-results-section').classList.remove('hidden');
+      document.getElementById('parse-results-section').classList.add('slide-in');
+      log(`✅ Готово: ${parsedLinks.length} ссылок`, 'ok', 'parse-log-area');
+      setStatus(`Найдено: ${parsedLinks.length} ссылок`, 'parse-status-bar');
+      document.getElementById('parse-pages-hint').textContent = '';
+      resetParseBtn();
+      if (parseEvtSrc) { parseEvtSrc.close(); parseEvtSrc = null; }
+      return;
+    }
+
+    if (msg.type === 'error') {
+      log('✗ ' + msg.text, 'err', 'parse-log-area');
+      setStatus('Ошибка', 'parse-status-bar');
+      resetParseBtn();
+      if (parseEvtSrc) { parseEvtSrc.close(); parseEvtSrc = null; }
+      return;
+    }
+  };
+
+  parseEvtSrc.onerror = () => {
+    if (parseEvtSrc) { parseEvtSrc.close(); parseEvtSrc = null; }
+    resetParseBtn();
+  };
+}
+
+function setParsePct(pct, label) {
+  document.getElementById('parse-progress-fill').style.width = pct + '%';
+  document.getElementById('parse-progress-pct').textContent  = Math.round(pct) + '%';
+  document.getElementById('parse-progress-label').textContent = label;
+}
+
+function resetParseBtn() {
+  const btn = document.getElementById('btn-parse');
+  btn.disabled = false;
+  btn.innerHTML = '🔍&nbsp;Парсить';
+}
+
+function copyLinks() {
+  const area = document.getElementById('parse-links-area');
+  if (!area.value) return;
+  navigator.clipboard.writeText(area.value).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✓ Скопировано';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }).catch(() => {
+    area.select(); document.execCommand('copy');
+  });
+}
+
+function sendToBulk() {
+  if (!parsedLinks.length) return;
+  document.getElementById('bulk-urls').value = parsedLinks.join('\n');
+  // trigger count update
+  document.getElementById('bulk-urls').dispatchEvent(new Event('input'));
+  switchTab('bulk');
+  // scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
